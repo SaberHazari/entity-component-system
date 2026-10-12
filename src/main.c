@@ -2,20 +2,7 @@
 #include <sys/mman.h>
 #include <assert.h>
 
-static void *platform_arena_alloc(usize size, void *user);
-static void platform_arena_free(void *ptr, usize size, void *user);
-
-int main(void) {
-    Memory memory;
-    memory_init(&memory, platform_arena_alloc, platform_arena_free, 
-        NULL, 64 * 1024 * 1024, 10 * 1024 * 1024);
-    
-    
-    
-    return 0;
-}
-
-static void *platform_arena_alloc(usize size, void *user) {
+static void *platform__arena_alloc(usize size, void *user) {
     (void)user;
     void *mem = mmap(0, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if(mem == MAP_FAILED) {
@@ -28,7 +15,16 @@ static void *platform_arena_alloc(usize size, void *user) {
     return mem;
 }
 
-static void platform_arena_free(void *ptr, usize size, void *user) {
+static void platform__arena_free(void *ptr, usize size, void *user) {
     (void)user;
     munmap(ptr, size);
+}
+int main(void) {
+    Memory memory;
+    memory_init(&memory, platform__arena_alloc, platform__arena_free, 
+        NULL, 64 * 1024 * 1024, 10 * 1024 * 1024);
+    
+    
+    
+    return 0;
 }
