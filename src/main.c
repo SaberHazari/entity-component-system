@@ -19,6 +19,7 @@ static void platform__arena_free(void *ptr, usize size, void *user) {
     (void)user;
     munmap(ptr, size);
 }
+
 int main(void) {
     Memory memory;
     memory_init(&memory, platform__arena_alloc, platform__arena_free, 

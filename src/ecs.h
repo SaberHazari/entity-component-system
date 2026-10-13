@@ -18,6 +18,4 @@ static inline void mask_clear(Mask *mask, u32 comp_id) {
     mask->words[comp_id >> 6] &= ~(1ull << (comp_id & 63));
 }
 
-static inline void 
-
 #endif
