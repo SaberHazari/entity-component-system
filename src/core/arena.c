@@ -6,6 +6,10 @@ static inline usize arena__align_up(usize n, usize align) {
     return (n + (align - 1)) & ~(align - 1);
 }
 
+static inline uptr arena_align_up_ptr(uptr addr, usize align) {
+    return (addr + (align - 1)) & ~(uptr)(align - 1);
+}
+
 static inline usize arena__block_header_size(void) {
     return arena__align_up(sizeof(ArenaBlock), ARENA_MIN_ALIGN);
 }
@@ -17,6 +21,10 @@ static inline u8 *arena__block_data(ArenaBlock *block) {
 static inline ArenaBlock *arena__new_block(Arena *arena, usize min_data_size) {
     usize data_size = arena->minimum_block_size;
     if(data_size < min_data_size) { data_size = min_data_size; }
+    if(data_size > SIZE_MAX - arena__block_header_size() - (ARENA_MIN_ALIGN - 1)) {
+        arena__fail(arena, data_size, ARENA_MIN_ALIGN);
+        return NULL;
+    }
     data_size = arena__align_up(data_size, ARENA_MIN_ALIGN);
     
     usize total = arena__block_header_size() + data_size;
@@ -40,6 +48,7 @@ static inline ArenaBlock *arena__new_block(Arena *arena, usize min_data_size) {
     arena->current_block = block;
     arena->total_size += data_size;
     
+    arena__poison_m(arena__block_data(block), data_size);
     return block;
 }
 
@@ -71,33 +80,37 @@ void *arena_push(Arena *arena, usize size, usize align) {
     if(block) {
         uptr base = (uptr)arena__block_data(block);
         uptr addr = base + block->used;
-        uptr aligned = (addr + (align - 1)) & ~(uptr)(align - 1);
+        uptr aligned = arena_align_up_ptr(addr, align);
         usize off = (usize)(aligned - base);
         
-        if(off + size <= block->size) {
+        if(off <= block->size && size <= block->size - off) {
             void *result = (u8 *)aligned;
             usize new_used = off + size;
             arena->total_used += new_used - block->used;
             if(arena->total_used > arena->peak) { arena->peak = arena->total_used; }
             block->used = new_used;
-            arena_unpoison_m(result, size);
+            arena__unpoison_m(result, size);
             return result;
         }
     }
     
+    if(size > SIZE_MAX - align) {
+        arena__fail(arena, size, align);
+        return NULL;
+    }
     ArenaBlock *fresh = arena__new_block(arena, size + align);
     if(!fresh) { return NULL; }
     
     uptr base = (uptr)arena__block_data(fresh);
-    uptr aligned = (base + (align - 1)) & ~(uptr)(align - 1);
+    uptr aligned = arena_align_up_ptr(base, align);
     usize off = (usize)(aligned - base);
     
     void *result = (u8 *)aligned;
     usize new_used = off + size;
-    arena->total_used += new_used - fresh->used;
+    arena->total_used += new_used;
     if(arena->total_used > arena->peak) { arena->peak = arena->total_used; }
     fresh->used = new_used;
-    arena_unpoison_m(result, size);
+    arena__unpoison_m(result, size);
     return result;
 }
 
@@ -109,10 +122,10 @@ void arena_pop_to(Arena *arena, ArenaMark mark) {
         assert(block && "mark doesn't belong to this arena");
         ArenaBlock *prev = block->prev;
         usize total = arena__block_header_size() + block->size;
-        arena_unpoison_m(arena__block_data(block), block->size);
-        arena->free(block, total, arena->alloc_user);
+        arena__unpoison_m(arena__block_data(block), block->size);
         arena->total_size -= block->size;
         arena->total_used -= block->used;
+        arena->free(block, total, arena->alloc_user);
         block = prev;
     }
     
@@ -123,7 +136,7 @@ void arena_pop_to(Arena *arena, ArenaMark mark) {
         usize old_used = arena->current_block->used;
         assert(mark.used <= old_used && "mark is newer than current usage");
         if(mark.used < old_used) {
-            arena_poison_m(arena__block_data(arena->current_block) + mark.used, old_used - mark.used);
+            arena__poison_m(arena__block_data(arena->current_block) + mark.used, old_used - mark.used);
             arena->total_used -= (old_used - mark.used);
         }
         arena->current_block->used = mark.used;
@@ -141,15 +154,15 @@ void arena_clear(Arena *arena) {
     while(block != first) {
         ArenaBlock *prev = block->prev;
         usize total = arena__block_header_size() + block->size;
-        arena_unpoison_m(arena__block_data(block), block->size);
-        arena->free(block, total, arena->alloc_user);
+        arena__unpoison_m(arena__block_data(block), block->size);
         arena->total_size -= block->size;
+        arena->free(block, total, arena->alloc_user);
         block = prev;
     }
     
     first->next = NULL;
     if(first->used) {
-        arena_poison_m(arena__block_data(first), first->used);
+        arena__poison_m(arena__block_data(first), first->used);
     }
     first->used = 0;
     
@@ -163,7 +176,7 @@ void arena_destroy(Arena *arena) {
     while(block) {
         ArenaBlock *next = block->next;
         usize total = arena__block_header_size() + block->size;
-        arena_unpoison_m(arena__block_data(block), block->size);
+        arena__unpoison_m(arena__block_data(block), block->size);
         arena->free(block, total, arena->alloc_user);
         block = next;
     }

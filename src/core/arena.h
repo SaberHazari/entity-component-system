@@ -63,13 +63,22 @@ static inline void arena__fail(const Arena *arena, usize size, usize align) {
     abort();
 }
 
+#undef ARENA_ASAN
 #if defined(__SANITIZE_ADDRESS__)
+    #define ARENA_ASAN 1
+#elif defined(__has_feature)
+    #if __has_feature(address_sanitizer)
+        #define ARENA_ASAN 1
+    #endif
+#endif
+
+#if defined(ARENA_ASAN)
     #include <sanitizer/asan_interface.h>
-    #define arena_poison_m(p, n) ASAN_POISON_MEMORY_REGION((p), (n))
-    #define arena_unpoison_m(p, n) ASAN_UNPOISON_MEMORY_REGION((p), (n))
+    #define arena__poison_m(p, n) ASAN_POISON_MEMORY_REGION((p), (n))
+    #define arena__unpoison_m(p, n) ASAN_UNPOISON_MEMORY_REGION((p), (n))
 #else
-    #define arena_poison_m(p, n) ((void)(p), (void)(n))
-    #define arena_unpoison_m(p, n) ((void)(p), (void)(n))
+    #define arena__poison_m(p, n) ((void)(p), (void)(n))
+    #define arena__unpoison_m(p, n) ((void)(p), (void)(n))
 #endif
 
 void arena_init(Arena *arena, const char *name, usize minimum_block_size, 

@@ -15,7 +15,7 @@ BIN = $(BUILD_DIR)/ecs
 WARN_FLAGS = -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wstrict-prototypes
 SANITIZE ?= address,undefined
 SANITIZE_FLAGS = $(if $(1),-fsanitize=$(1) -fno-omit-frame-pointer)
-FLAGS = $(WARN_FLAGS) -std=c17 -I$(SRC_DIR) -g -O1 $(call sanitize_flags,$(SANITIZE))
+FLAGS = $(WARN_FLAGS) -std=c17 -I$(SRC_DIR) -g -O1 $(call SANITIZE_FLAGS,$(SANITIZE))
 
 # Sources
 SRCS = $(shell find $(SRC_DIR) -type f -name '*.c')

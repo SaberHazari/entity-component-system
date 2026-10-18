@@ -1,6 +1,8 @@
-#include "memory.h"
+#include "test_arena.h"
+#include "test_harness.h"
+#include "core/arena.h"
+#include "core/memory.h"
 #include <sys/mman.h>
-#include <assert.h>
 
 static void *platform__arena_alloc(usize size, void *user) {
     (void)user;
@@ -20,12 +22,6 @@ static void platform__arena_free(void *ptr, usize size, void *user) {
     munmap(ptr, size);
 }
 
-int main(void) {
-    Memory memory;
-    memory_init(&memory, platform__arena_alloc, platform__arena_free, 
-        NULL, 64 * 1024 * 1024, 10 * 1024 * 1024);
-    
-    
-    
-    return 0;
+void test_arena_run_all(void) {
+    printf("Arena:\n");
 }

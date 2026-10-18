@@ -2,7 +2,7 @@
 #define UTILS_H
 
 #include <stdint.h>
-#include <stddef.h>
+#include <stdbool.h>
 
 typedef int8_t i8;
 typedef int16_t i16;
@@ -21,5 +21,9 @@ typedef int32_t b32;
 
 typedef size_t usize;
 typedef uintptr_t uptr;
+
+#define kilo_bytes_m(value) ((u64)(value) * (u64)1024)
+#define mega_bytes_m(value) (kilo_bytes_m(value) * (u64)1024)
+#define giga_bytes_m(value) (mega_bytes_m(value) * (u64)1024)
 
 #endif
