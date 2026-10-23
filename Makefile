@@ -2,7 +2,7 @@
 CC = clang
 
 # Libraries
-LIBS =
+LIBS = -lm
 
 # Directories
 PROJECT_DIR = $(HOME)/entity-component-system
